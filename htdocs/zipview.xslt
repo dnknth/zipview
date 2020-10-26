@@ -12,7 +12,7 @@
             <xsl:value-of select="@name" />
         </title>
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <link rel="stylesheet" type="text/css" href="../zipview.css" />
+        <link rel="stylesheet" type="text/css" href="/zipview.css" />
       </head>
       <body>
 	      <h1>

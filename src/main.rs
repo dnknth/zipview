@@ -42,17 +42,43 @@ fn extract<R: Read + Seek>( archive: &mut ZipArchive<R>, path: &str) -> Option< 
 }
 
 
+/// Check whether `path` starts with `prefix`
+/// and does not contain additional path separators `/`.
+fn matches( path: &str, prefix: &str) -> bool {
+    if !path.starts_with( prefix) {
+        false
+    }
+    else {
+        let path2 = String::from( path.replace( prefix, ""));
+        let n = path2.chars().filter( |c| *c == '/').count();
+        n == 0 || (n == 1 && path2.ends_with( "/"))
+    }
+}
+
+
 /// Produce an XML listing of the archive content.
 /// Returns a HTTP response.
-fn list<R: Read + Seek>( archive: &mut ZipArchive<R>, title: &str) -> cgi::Response {
-    // Sort archive contents by lowercase name
-    let mut names : Vec<&str> = archive.file_names().collect();
+fn list<R: Read + Seek>( archive: &mut ZipArchive<R>, title: &str, prefix: &str) -> cgi::Response {
+
+    // Add a trailing slash to directory name `prefix`
+    let mut prefix2: String = String::from( prefix);
+    if !prefix.is_empty() {
+        prefix2.push( '/');
+    }
+    
+    // Get contents of directory
+    let mut names : Vec<String> = archive.file_names()
+        .filter( |s| matches( s, &prefix2))
+        .map( |s| s.replace( &prefix2, ""))
+        .collect();
+
+    // Sort contents by lowercase name
     names.sort_by( |a, b| a.to_lowercase().cmp( &b.to_lowercase()));
     
     // Render XML listing
     cgi::binary_response( 200, "text/xml", xml! {
         <?xml version="1.0" encoding="UTF-8"?>
-        <?xml-stylesheet type="text/xsl" href="../zipview.xslt"?>
+        <?xml-stylesheet type="text/xsl" href="/zipview.xslt"?>
         <zip name={title}>
             for name in (&names) {
                 if (name.ends_with( "/")) {
@@ -74,23 +100,25 @@ fn list<R: Read + Seek>( archive: &mut ZipArchive<R>, title: &str) -> cgi::Respo
 }
 
 
+// Main entry point
 cgi::cgi_main! { |_request: cgi::Request| -> cgi::Response {
     
-    let mut path_info = env::var( "PATH_INFO").unwrap();
-    let mut path = env::var( "PATH_TRANSLATED").unwrap();
+    let url_path = env::var( "PATH_INFO").unwrap();
+    let mut url = String::from( &url_path);
+    let mut zip_path = env::var( "PATH_TRANSLATED").unwrap();
     let mut extra = String::new();
 
     loop { // Extract Zip file path from PATH_TRANSLATED
         
-        if let Ok( md) = fs::metadata( &path) {
+        if let Ok( md) = fs::metadata( &zip_path) {
             if md.is_file() { // Got it
                 break;
             };
         }
         
         // Get all path components
-        let mut parts_info = path_info.split( '/').collect::<Vec<_>>();
-        let mut parts = path.split( '/').collect::<Vec<_>>();
+        let mut parts_info = url.split( '/').collect::<Vec<_>>();
+        let mut parts = zip_path.split( '/').collect::<Vec<_>>();
 
         // Move the last non-empty part into `extra`
         parts_info.pop();
@@ -102,8 +130,8 @@ cgi::cgi_main! { |_request: cgi::Request| -> cgi::Response {
                     }
                     extra.insert_str( 0, &last);
                 }
-                path_info = parts_info.join( "/");
-                path = parts.join( "/");
+                url = parts_info.join( "/");
+                zip_path = parts.join( "/");
             },
             None => { // Empty result?
                 return cgi::empty_response( 404);
@@ -112,7 +140,7 @@ cgi::cgi_main! { |_request: cgi::Request| -> cgi::Response {
     }
     
     // Add a trailing slash to the Zip path,
-    // needed for link resolution in `index.html`.
+    // we need it for link resolution in `index.html`.
     if extra.len() == 0 {
         let mut location = env::var( "PATH_INFO").unwrap();
         if !location.ends_with( "/") {
@@ -120,25 +148,24 @@ cgi::cgi_main! { |_request: cgi::Request| -> cgi::Response {
             return redirect( &location);
         }
     }
-    
-    match fs::File::open( &path) {
+
+    // Let's go!
+    match fs::File::open( &zip_path) {
         Ok( file) => match zip::ZipArchive::new( file) {
             Ok( mut archive) => {
-                if extra.len() > 0 { // Extract single file from archive
-                    extract( &mut archive, &extra).unwrap_or( 
-                        cgi::empty_response( 404))
-                }
-                else { // List archive content
+                if url_path.ends_with( "/") { // List archive content
                     // Show index.html if present on top level
                     match extract( &mut archive, "index.html") {
                         Some( index) => { 
                             return index;
                         }
-                        None => { // Fall through to XML listing
-                        }
+                        None => {} // Return XML listing
                     };
-                    // List Zip file content
-                    list( &mut archive, &path_info)
+                    list( &mut archive, &url_path, &extra)
+                }
+                else { // Extract single file from archive
+                    extract( &mut archive, &extra).unwrap_or( 
+                        cgi::empty_response( 404))
                 }
             },
             Err( e) => cgi::err_to_500( Err( e))
