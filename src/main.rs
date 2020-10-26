@@ -9,12 +9,12 @@ use format_xml::xml;
 use zip::ZipArchive;
 
 
-/// Issue a HTTP redirect to the given `location`.
+/// Issue a HTTP 307 redirect to the given `location`.
 fn redirect( location: &str) -> cgi::Response {
     cgi::http::response::Builder::new()
         .status( 307)
         .header( cgi::http::header::LOCATION, location)
-        .body(vec![])
+        .body( vec![])
         .unwrap()
 }
 
@@ -56,8 +56,7 @@ fn matches( path: &str, prefix: &str) -> bool {
 }
 
 
-/// Produce an XML listing of the archive content.
-/// Returns a HTTP response.
+/// Produce a HTTP response with a XML listing of the archive content.
 fn list<R: Read + Seek>( archive: &mut ZipArchive<R>, title: &str, prefix: &str) -> cgi::Response {
 
     // Add a trailing slash to directory name `prefix`
@@ -75,7 +74,7 @@ fn list<R: Read + Seek>( archive: &mut ZipArchive<R>, title: &str, prefix: &str)
     // Sort contents by lowercase name
     names.sort_by( |a, b| a.to_lowercase().cmp( &b.to_lowercase()));
     
-    // Render XML listing
+    // Render XML
     cgi::binary_response( 200, "text/xml", xml! {
         <?xml version="1.0" encoding="UTF-8"?>
         <?xml-stylesheet type="text/xsl" href="/zipview.xslt"?>
@@ -139,8 +138,8 @@ cgi::cgi_main! { |_request: cgi::Request| -> cgi::Response {
         }
     }
     
-    // Add a trailing slash to the Zip path,
-    // we need it for link resolution in `index.html`.
+    // Add a trailing slash to the Zip path
+    // for correct link resolution.
     if extra.len() == 0 {
         let mut location = env::var( "PATH_INFO").unwrap();
         if !location.ends_with( "/") {
@@ -154,8 +153,13 @@ cgi::cgi_main! { |_request: cgi::Request| -> cgi::Response {
         Ok( file) => match zip::ZipArchive::new( file) {
             Ok( mut archive) => {
                 if url_path.ends_with( "/") { // List archive content
-                    // Show index.html if present on top level
-                    match extract( &mut archive, "index.html") {
+                    // Show `index.html` if present in current directory
+                    let mut dirindex = String::from( &extra);
+                    if !dirindex.is_empty() {
+                        dirindex.push( '/');
+                    }
+                    dirindex.push_str( "index.html");
+                    match extract( &mut archive, &dirindex) {
                         Some( index) => { 
                             return index;
                         }
