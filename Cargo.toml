@@ -7,7 +7,10 @@ edition = "2018"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-cgi = "0.6.0"
-zip = "0.5.8"
-mime_guess = "2.0.3"
-format_xml = "0.1.6"
+
+# See: https://doc.rust-lang.org/cargo/reference/specifying-dependencies.html
+
+cgi = "~0.6.0"
+zip = "~0.5.8"
+mime_guess = "~2.0.3"
+format_xml = "~0.1.6"

@@ -1,0 +1,45 @@
+h1, h2, h3, h4, h5, h6 {
+	font-family: Courier New, Courier, monospace;
+}
+
+h1 {
+   background-color: #EEE;
+   padding-left: 1em;
+   border: 1px solid #CCC;
+}
+
+h3 {
+   margin-top: 2em;
+   font-size: x-large;
+}
+
+h4 {
+   margin-top: 1em;
+   font-size: large;
+}
+
+body {
+	font-family: Verdana, Helvetica, Arial, sans-serif;
+}
+
+hr {
+  height: 1px;
+}
+
+a:link, a:visited {
+	color: rgb(179, 035, 000);
+	text-decoration: none;
+}
+
+a:active, a:hover {
+	color: rgb(179, 035, 000);
+	text-decoration: underline;
+}
+
+img {
+   position: relative;
+   top: 2px;
+   margin-right: 4px;
+   margin-left: 4px;
+   width: 18px;
+}
